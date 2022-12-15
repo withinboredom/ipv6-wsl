@@ -1,4 +1,4 @@
-# WSL IPv6 packet duplicator
+# WSL IPv6 packet enabler
 
 IPv6 on Windows and WSL has been a bane of my existence for years. When working 
 on a project that specifically required IPv6, I realized I'd have to figure out

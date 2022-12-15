@@ -8,7 +8,27 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <Title>WSL IPv6 Enabler</Title>
+    <Authors>Rob Landers</Authors>
+    <Company>Wicked Monkey Software</Company>
+    <Product>IPv6 Enabler</Product>
+    <Description>Enables IPv6 for WSL</Description>
+    <Copyright>2022 Rob Landers / Wicked Monkey Software</Copyright>
+    <PackageProjectUrl>https://github.com/withinboredom/ipv6-wsl</PackageProjectUrl>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/withinboredom/ipv6-wsl</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="SharpPcap" Version="6.2.5" />
