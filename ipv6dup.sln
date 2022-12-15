@@ -3,7 +3,18 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.4.33205.214
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ipv6dup-ui", "ipv6dup-ui\ipv6dup-ui.csproj", "{0736E90F-CB6B-4347-803E-D7FEF806F8D4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ipv6dup-ui", "ipv6dup-ui\ipv6dup-ui.csproj", "{0736E90F-CB6B-4347-803E-D7FEF806F8D4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{245A08FE-A88B-4F5C-BB20-A0A2F6625452}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "images", "images", "{C64C812F-4921-441C-B474-5CAE25B7EDEE}"
+	ProjectSection(SolutionItems) = preProject
+		program.png = program.png
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,6 +29,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{C64C812F-4921-441C-B474-5CAE25B7EDEE} = {245A08FE-A88B-4F5C-BB20-A0A2F6625452}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {172ED6BD-714E-4E39-B9C4-BFD8DE0B1289}
