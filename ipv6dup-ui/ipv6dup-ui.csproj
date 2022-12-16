@@ -21,6 +21,7 @@
     <NeutralLanguage>en</NeutralLanguage>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+    <ApplicationIcon>network.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,6 +38,10 @@
 
   <ItemGroup>
     <EditorConfigFiles Remove="C:\Users\lande\source\repos\ipv6dup\ipv6dup-ui\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="network.ico" />
   </ItemGroup>
 
   <ItemGroup>

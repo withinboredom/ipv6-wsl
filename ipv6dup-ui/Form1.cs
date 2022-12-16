@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
+using Microsoft.Win32;
 using SharpPcap.LibPcap;
 
 namespace ipv6dup_ui
@@ -27,6 +28,10 @@ namespace ipv6dup_ui
 		///   Whether we are enabled or not
 		/// </summary>
 		private bool _enabled;
+
+		private bool _loading = true;
+
+		private const string RegistryValue = "WSL IPv6 Enabler";
 
 		/// <summary>
 		///   Create a form
@@ -71,6 +76,15 @@ namespace ipv6dup_ui
 					deviceBox.SelectedIndex = deviceBox.Items.Count - 1;
 				}
 			}
+
+			var reg = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+			var onStartup = reg?.GetValue(RegistryValue)?.ToString();
+			if(!string.IsNullOrEmpty(onStartup))
+			{
+				checkBox1.Checked = true;
+			}
+
+			_loading = false;
 		}
 
 		/// <summary>
@@ -218,6 +232,48 @@ namespace ipv6dup_ui
 				}
 
 				_injector.InternetDevice = device;
+			}
+		}
+
+		private void Form1_Resize(object sender, EventArgs e)
+		{
+			if (WindowState != FormWindowState.Minimized)
+			{
+				return;
+			}
+
+			ShowInTaskbar = false;
+			notifyIcon1.Visible = true;
+			notifyIcon1.ShowBalloonTip(0);
+		}
+
+		private void notifyIcon1_DoubleClick(object sender, EventArgs e)
+		{
+			if (WindowState != FormWindowState.Minimized)
+			{
+				return;
+			}
+
+			ShowInTaskbar = true;
+			notifyIcon1.Visible = false;
+			WindowState = FormWindowState.Normal;
+		}
+
+		private void checkBox1_CheckedChanged(object sender, EventArgs e)
+		{
+			if (_loading) return;
+
+			var reg = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
+			switch (checkBox1.CheckState)
+			{
+				case CheckState.Checked:
+					reg?.SetValue("WSL IPv6 Enabler", Application.ExecutablePath.ToString());
+					break;
+				case CheckState.Unchecked:
+					reg?.DeleteValue("WSL IPv6 Enabler");
+					break;
+				case CheckState.Indeterminate:
+					throw new NotImplementedException();
 			}
 		}
 	}
