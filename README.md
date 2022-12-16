@@ -70,6 +70,19 @@ Here's the gist:
 
 As long as WSL continues to ping an ipv6 address, ipv6 connectivity will work without any further work.
 
+## Privacy concerns
+
+This program REQUIRES an ipv6 address to ping. It is currently hardcoded to one of my servers:
+
+`2a01:4f9:6b:5601::2`: [RIPE](https://apps.db.ripe.net/db-web-ui/query?searchtext=2a01:4f9:6b:5601::2)
+
+Supposedly, I could see who is using this software. However, nothing is tracked or monitored. I do not guarantee this
+server to be up 100% of the time and if this server is down, this software will misbehave.
+
+If you have any ideas on how to make this better, please open an issue.
+
+I do recommend building this from source and using an IP address you trust if this is a concern for you.
+
 ### Get the program
 
 You can either download the source and build it yourself or download the binary from releases.
