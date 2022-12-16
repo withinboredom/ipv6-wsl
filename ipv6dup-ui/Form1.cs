@@ -2,167 +2,223 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text;
-using PacketDotNet;
-using SharpPcap;
 using SharpPcap.LibPcap;
-using SharpPcap.WinDivert;
 
 namespace ipv6dup_ui
 {
-    public partial class Form1 : Form
-    {
-        private ILiveDevice? _internetDevice = null;
-        private PhysicalAddress? _rewriteDestination = null;
-        private readonly IPAddress[]? _addresses = null;
+	public partial class Form1 : Form
+	{
+		/// <summary>
+		///   The injector to inject packets with
+		/// </summary>
+		private readonly Injector _injector;
 
-        private bool _enabled = false;
-        private long _packets = 0;
+		/// <summary>
+		///   The pinger to determine current status
+		/// </summary>
+		private readonly Pinger _pinger;
 
-        public Form1()
-        {
-            InitializeComponent();
-            var devices = CaptureDeviceList.Instance;
-            var hostname = System.Net.Dns.GetHostName();
-            var addresses = Dns.GetHostAddresses(hostname);
-            Console.WriteLine($"Detected {addresses.Length} IP addresses: {string.Join(", ",addresses.Select(e => e.ToString()))}");
+		/// <summary>
+		///   Whether we are connected or not
+		/// </summary>
+		private bool _connected;
 
-            _addresses = addresses.Where(address => address.AddressFamily == AddressFamily.InterNetworkV6).ToArray();
+		/// <summary>
+		///   Whether we are enabled or not
+		/// </summary>
+		private bool _enabled;
 
-            foreach (var device in devices)
-            {
-                if (device.MacAddress == null) continue;
-                Console.WriteLine($"Found valid device: {device.Description} with mac address {device.MacAddress} [{device.Name}]");
-                deviceBox.Items.Add($"{device.Description} [{device.MacAddress}]");
-            }
-        }
+		/// <summary>
+		///   Create a form
+		/// </summary>
+		public Form1()
+		{
+			InitializeComponent();
+			var devices = LibPcapLiveDeviceList.Instance;
+			var hostname = Dns.GetHostName();
+			var addresses = Dns.GetHostAddresses(hostname);
 
-        private void ChangedInternetDevice(object sender, EventArgs e)
-        {
-            var devices = LibPcapLiveDeviceList.Instance;
+			_pinger = new Pinger("2a01:4f9:6b:5601::2");
+			_injector = new Injector
+			{
+				Addresses = addresses.Where(address => address.AddressFamily == AddressFamily.InterNetworkV6).ToArray()
+			};
 
-            foreach (var device in devices)
-            {
-                if (deviceBox.SelectedItem == null || device.MacAddress == null) continue;
-                if (!deviceBox.SelectedItem.ToString()!.Contains(device.MacAddress.ToString())) continue;
+			if (!string.IsNullOrEmpty(PreviousValues.Default.MacAddress))
+			{
+				_injector.RewriteDestination = PhysicalAddress.Parse(PreviousValues.Default.MacAddress);
+				maskedTextBox1.Text = PreviousValues.Default.MacAddress;
+			}
 
-                if (_internetDevice != null)
-                {
-                    Console.WriteLine($"Stopping capture on {_internetDevice.Description}.");
-                    _internetDevice.StopCapture();
-                    _internetDevice.Close();
-                }
+			foreach (var device in devices)
+			{
+				wslBox.Items.Add(device.Description);
+				if (device.Description == PreviousValues.Default.InternetDevice)
+				{
+					_injector.InternetDevice = device;
+					wslBox.SelectedIndex = wslBox.Items.Count - 1;
+				}
 
-                _internetDevice = device;
-                _internetDevice.Open(new DeviceConfiguration {Snaplen = 65000, Mode = DeviceModes.MaxResponsiveness, BufferSize = 65000 * 100, ReadTimeout = 100});
-                _internetDevice.OnPacketArrival += InternetDeviceOnOnPacketArrival;
-                _internetDevice.StartCapture();
-                Console.WriteLine($"Starting capture on {_internetDevice.Description}.");
-            }
-        }
+				if (device.MacAddress == null)
+				{
+					continue;
+				}
 
-        private void InternetDeviceOnOnPacketArrival(object sender, PacketCapture e)
-        {
-            if (!_enabled) return;
+				deviceBox.Items.Add($"{device.Description} [{device.MacAddress}]");
+				if (PreviousValues.Default.InternalDevice.Contains(device.MacAddress.ToString()))
+				{
+					_injector.InternalDevice = device;
+					deviceBox.SelectedIndex = deviceBox.Items.Count - 1;
+				}
+			}
+		}
 
-            // parse the packet
-            var rawPacket = e.GetPacket();
-            var packet = Packet.ParsePacket(rawPacket.LinkLayerType, rawPacket.Data);
+		/// <summary>
+		///   The user has changed the internal device, so update state
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void ChangedInternalDevice(object sender, EventArgs e)
+		{
+			var devices = LibPcapLiveDeviceList.Instance;
 
-            // check that the packet is an ethernet packet with our mac address
-            if (packet is not EthernetPacket eth) return;
-            if (eth.Type != EthernetType.IPv6 ||
-                !Equals(eth.DestinationHardwareAddress, _internetDevice?.MacAddress)) return;
+			foreach (var device in devices)
+			{
+				if (deviceBox.SelectedItem == null || device.MacAddress == null)
+				{
+					continue;
+				}
 
-            var checkedPacket = false;
+				if (!deviceBox.SelectedItem.ToString()!.Contains(device.MacAddress.ToString()))
+				{
+					continue;
+				}
 
-            var icmp = packet.Extract<IcmpV6Packet>();
-            if (icmp != null)
-            {
-                // don't send icmp6 packets onwards, it just confuses the entire network.
-                // todo: check what happens with directed NDP packets, do they get handled correctly?
-                return;
-            }
+				_injector.InternalDevice = device;
+			}
+		}
 
-            var ipv6 = packet.Extract<IPv6Packet>();
-            if (ipv6 != null)
-            {
-                if (_addresses?.Contains(ipv6.DestinationAddress) == true)
-                {
-                    // skip any packets destined for the host ip address.
-                    return;
-                }
+		/// <summary>
+		///   The user has clicked the start button
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void StartButtonClick(object sender, EventArgs e)
+		{
+			_injector.RewriteDestination = PhysicalAddress.Parse(maskedTextBox1.Text);
 
-                Console.WriteLine($"Going to rewrite ipv6 packet for {ipv6.DestinationAddress} to {_rewriteDestination}");
-                checkedPacket = true;
-            }
+			if (!_injector.Ready)
+			{
+				MessageBox.Show(@"Please select devices and enter a mac address", @"Not ready yet", MessageBoxButtons.OK,
+					MessageBoxIcon.Stop);
+				return;
+			}
 
-            if (!checkedPacket) return;
+			StopButton.Enabled = true;
+			startButton.Enabled = false;
+			_injector.Enabled = true;
+			_enabled = true;
 
-            eth.DestinationHardwareAddress = _rewriteDestination;
+			PreviousValues.Default.MacAddress = _injector.RewriteDestination.ToString();
+			PreviousValues.Default.InternalDevice = _injector.InternalDevice?.MacAddress.ToString();
+			PreviousValues.Default.InternetDevice = _injector.InternetDevice?.Description;
+			PreviousValues.Default.Save();
+		}
 
-            try
-            {
-                _internetDevice?.SendPacket(eth.Bytes);
-                _packets += 1;
-            }
-            catch
-            {
-                Console.WriteLine("Failed to write packet!");
-            }
-        }
+		/// <summary>
+		///   Update the textbox with only valid characters
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void MacAddressChanged(object sender, EventArgs e)
+		{
+			var value = new StringBuilder();
+			foreach (var t in maskedTextBox1.Text)
+			{
+				if (t is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F')
+				{
+					value.Append(t.ToString().ToUpperInvariant());
+				}
+			}
 
-        private void maskedTextBox1_MaskInputRejected(object sender, MaskInputRejectedEventArgs e)
-        {
+			if (value.Length != maskedTextBox1.Text.Length)
+			{
+				maskedTextBox1.Text = value.ToString();
+			}
+		}
 
-        }
+		/// <summary>
+		///   Update stats and status
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void TimerTick(object sender, EventArgs e)
+		{
+			var connection = "no";
+			if (_pinger.CurrentStatus == Pinger.Status.Degraded ||
+			    (_pinger.LastSeq - _pinger.LastDup < 10 && _pinger.LastDup > 0))
+			{
+				connection = "degraded";
+			}
 
-        private void StartButtonClick(object sender, EventArgs e)
-        {
-            _rewriteDestination = PhysicalAddress.Parse(maskedTextBox1.Text);
+			if (_pinger.CurrentStatus == Pinger.Status.Connected)
+			{
+				connection = "yes";
+				_connected = true;
+				_injector.Enabled = false;
+			}
+			else
+			{
+				_connected = false;
+				_injector.Enabled = _enabled;
+			}
 
-            //Console.WriteLine(BitConverter.ToString(_rewriteDestination));
+			if (_injector.Enabled && !_connected)
+			{
+				_pinger.Helping = true;
+			}
 
-            if (_internetDevice == null || _rewriteDestination == null) return;
+			label4.Text = $@"Packets Handled: {_injector.HandledPackets:N0}";
+			label2.Text = $@" Packets Captured:  {_injector.CapturedPackets:N0}";
+			label6.Text = $@"IPv6 Working: {connection}";
+		}
 
-            StopButton.Enabled = true;
-            startButton.Enabled = false;
-            _enabled = true;
-        }
+		/// <summary>
+		///   User has clicked the stop button
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void StopButton_Click(object sender, EventArgs e)
+		{
+			_injector.Enabled = false;
+			StopButton.Enabled = false;
+			startButton.Enabled = true;
+			_enabled = false;
+		}
 
-        private void maskedTextBox1_TextChanged(object sender, EventArgs e)
-        {
-            StringBuilder value = new StringBuilder();
-            foreach (var t in maskedTextBox1.Text)
-            {
-                if (t is >= '0' and <= '9' or >= 'a' and <= 'f' or >= 'A' and <= 'F') value.Append(t.ToString().ToUpperInvariant());
-            }
+		/// <summary>
+		///   User has selected a new internet device
+		/// </summary>
+		/// <param name="sender"></param>
+		/// <param name="e"></param>
+		private void InternetDeviceChanged(object sender, EventArgs e)
+		{
+			var devices = LibPcapLiveDeviceList.Instance;
 
-            if (value.Length != maskedTextBox1.Text.Length)
-            {
-                maskedTextBox1.Text = value.ToString();
-            }
-        }
+			foreach (var device in devices)
+			{
+				if (wslBox.SelectedItem == null)
+				{
+					continue;
+				}
 
-        private void label4_Click(object sender, EventArgs e)
-        {
+				if (!wslBox.SelectedItem.ToString()!.Contains(device.Description))
+				{
+					continue;
+				}
 
-        }
-
-        private void timer1_Tick(object sender, EventArgs e)
-        {
-            label4.Text = $"Packets Handled {_packets:N0}";
-        }
-
-        private void StopButton_Click(object sender, EventArgs e)
-        {
-            _enabled = false;
-            StopButton.Enabled = false;
-            startButton.Enabled = true;
-        }
-
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-    }
+				_injector.InternetDevice = device;
+			}
+		}
+	}
 }
