@@ -13,7 +13,7 @@ namespace ipv6dup_ui
     {
         private ILiveDevice? _internetDevice = null;
         private PhysicalAddress? _rewriteDestination = null;
-        private IPAddress[] _addresses = null;
+        private readonly IPAddress[]? _addresses = null;
 
         private bool _enabled = false;
         private long _packets = 0;
@@ -44,7 +44,7 @@ namespace ipv6dup_ui
             {
                 if (deviceBox.SelectedItem == null || device.MacAddress == null) continue;
                 if (!deviceBox.SelectedItem.ToString()!.Contains(device.MacAddress.ToString())) continue;
-                
+
                 if (_internetDevice != null)
                 {
                     Console.WriteLine($"Stopping capture on {_internetDevice.Description}.");
@@ -53,7 +53,7 @@ namespace ipv6dup_ui
                 }
 
                 _internetDevice = device;
-                _internetDevice.Open();
+                _internetDevice.Open(new DeviceConfiguration {Snaplen = 65000, Mode = DeviceModes.MaxResponsiveness, BufferSize = 65000 * 100, ReadTimeout = 100});
                 _internetDevice.OnPacketArrival += InternetDeviceOnOnPacketArrival;
                 _internetDevice.StartCapture();
                 Console.WriteLine($"Starting capture on {_internetDevice.Description}.");
@@ -68,16 +68,27 @@ namespace ipv6dup_ui
             var rawPacket = e.GetPacket();
             var packet = Packet.ParsePacket(rawPacket.LinkLayerType, rawPacket.Data);
 
+            // check that the packet is an ethernet packet with our mac address
             if (packet is not EthernetPacket eth) return;
             if (eth.Type != EthernetType.IPv6 ||
                 !Equals(eth.DestinationHardwareAddress, _internetDevice?.MacAddress)) return;
+
             var checkedPacket = false;
+
+            var icmp = packet.Extract<IcmpV6Packet>();
+            if (icmp != null)
+            {
+                // don't send icmp6 packets onwards, it just confuses the entire network.
+                // todo: check what happens with directed NDP packets, do they get handled correctly?
+                return;
+            }
 
             var ipv6 = packet.Extract<IPv6Packet>();
             if (ipv6 != null)
             {
-                if (_addresses.Contains(ipv6.DestinationAddress))
+                if (_addresses?.Contains(ipv6.DestinationAddress) == true)
                 {
+                    // skip any packets destined for the host ip address.
                     return;
                 }
 
@@ -147,6 +158,11 @@ namespace ipv6dup_ui
             _enabled = false;
             StopButton.Enabled = false;
             startButton.Enabled = true;
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
         }
     }
 }

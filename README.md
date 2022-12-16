@@ -59,7 +59,7 @@ You can either download the source and build it yourself or download the binary 
 
 ## Select your interface
 
-![Screenshot][program.png]
+![Screenshot][[program.png]]
 
 In the interface, select the device that your computer is connected to.
 
