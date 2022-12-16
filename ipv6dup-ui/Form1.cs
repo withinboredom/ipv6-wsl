@@ -82,6 +82,7 @@ namespace ipv6dup_ui
 			if(!string.IsNullOrEmpty(onStartup))
 			{
 				checkBox1.Checked = true;
+				StartButtonClick(null!, null!);
 			}
 
 			_loading = false;
