@@ -66,6 +66,7 @@ Here's the gist:
 5. Push start.
 7. Connection will enter a degraded state until the routes are learned.
 8. Connection will finally say "yes" and then ipv6 will work natively.
+9. Check "start at startup" and then minimize the tray
 
 As long as WSL continues to ping an ipv6 address, ipv6 connectivity will work without any further work.
 

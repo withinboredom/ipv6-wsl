@@ -83,6 +83,7 @@ namespace ipv6dup_ui
 			{
 				checkBox1.Checked = true;
 				StartButtonClick(null!, null!);
+				WindowState = FormWindowState.Minimized;
 			}
 
 			_loading = false;
