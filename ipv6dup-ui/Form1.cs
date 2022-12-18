@@ -29,15 +29,18 @@ namespace ipv6dup_ui
 		/// </summary>
 		private bool _enabled;
 
-		private bool _loading = true;
+		private bool _loading;
 
 		private const string RegistryValue = "WSL IPv6 Enabler";
+
+		private bool _notifications = false;
 
 		/// <summary>
 		///   Create a form
 		/// </summary>
 		public Form1()
 		{
+			_loading = true;
 			InitializeComponent();
 			var devices = LibPcapLiveDeviceList.Instance;
 			var hostname = Dns.GetHostName();
@@ -77,8 +80,10 @@ namespace ipv6dup_ui
 				}
 			}
 
+			checkBox2.Checked = PreviousValues.Default.Notifications;
+
 			var reg = Registry.CurrentUser.OpenSubKey("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", true);
-			var onStartup = reg?.GetValue(RegistryValue)?.ToString();
+			var onStartup = reg?.GetValue(RegistryValue)?.ToString(); 
 			if(!string.IsNullOrEmpty(onStartup))
 			{
 				checkBox1.Checked = true;
@@ -121,7 +126,14 @@ namespace ipv6dup_ui
 		/// <param name="e"></param>
 		private void StartButtonClick(object sender, EventArgs e)
 		{
-			_injector.RewriteDestination = PhysicalAddress.Parse(maskedTextBox1.Text);
+			try
+			{
+				_injector.RewriteDestination = PhysicalAddress.Parse(maskedTextBox1.Text);
+			}
+			catch
+			{
+				_injector.RewriteDestination = null;
+			}
 
 			if (!_injector.Ready)
 			{
@@ -170,6 +182,7 @@ namespace ipv6dup_ui
 		/// <param name="e"></param>
 		private void TimerTick(object sender, EventArgs e)
 		{
+			var previous = label6.Text;
 			var connection = "no";
 			if (_pinger.CurrentStatus == Pinger.Status.Degraded ||
 			    (_pinger.LastSeq - _pinger.LastDup < 10 && _pinger.LastDup > 0))
@@ -197,6 +210,14 @@ namespace ipv6dup_ui
 			label4.Text = $@"Packets Handled: {_injector.HandledPackets:N0}";
 			label2.Text = $@" Packets Captured:  {_injector.CapturedPackets:N0}";
 			label6.Text = $@"IPv6 Working: {connection}";
+
+			if (previous != label6.Text)
+			{
+				previous = notifyIcon1.BalloonTipText;
+				notifyIcon1.BalloonTipText = $@"IPv6 status changed: {connection}";
+				notifyIcon1.ShowBalloonTip(0);
+				notifyIcon1.BalloonTipText = previous;
+			}
 		}
 
 		/// <summary>
@@ -244,9 +265,10 @@ namespace ipv6dup_ui
 				return;
 			}
 
-			ShowInTaskbar = false;
 			notifyIcon1.Visible = true;
 			notifyIcon1.ShowBalloonTip(0);
+			//ShowInTaskbar = false;
+			Hide();
 		}
 
 		private void notifyIcon1_DoubleClick(object sender, EventArgs e)
@@ -256,7 +278,8 @@ namespace ipv6dup_ui
 				return;
 			}
 
-			ShowInTaskbar = true;
+			Show();
+			//ShowInTaskbar = true;
 			notifyIcon1.Visible = false;
 			WindowState = FormWindowState.Normal;
 		}
@@ -276,6 +299,24 @@ namespace ipv6dup_ui
 					break;
 				case CheckState.Indeterminate:
 					throw new NotImplementedException();
+			}
+		}
+
+		private void checkBox2_CheckedChanged(object sender, EventArgs e)
+		{
+			_notifications = PreviousValues.Default.Notifications = checkBox2.Checked;
+		}
+
+		private void notifyIcon1_MouseDoubleClick(object sender, MouseEventArgs e)
+		{
+
+		}
+
+		private void Form1_Load(object sender, EventArgs e)
+		{
+			if (WindowState == FormWindowState.Minimized)
+			{
+				Hide();
 			}
 		}
 	}
